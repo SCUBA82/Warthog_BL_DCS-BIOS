@@ -111,9 +111,6 @@ public class MainForm : Form
     {
         try
         {
-            Console.WriteLine(
-                "MAIN: StartDcsBios()");
-
             _statusLabel.Text =
                 "DCS-BIOS: Listener wird erstellt...";
 
@@ -132,36 +129,19 @@ public class MainForm : Form
             _statusLabel.Text =
                 "DCS-BIOS: wird gestartet...";
 
-            Console.WriteLine(
-                "MAIN: Aufruf _dcsBios.Start()");
+            _warthogThrottle = new WarthogThrottle();
 
-              _warthogThrottle = new WarthogThrottle();
-
-_warthogThrottle.LogMessage += message =>
-{
-    _statusLabel.Text = message;
-};
+            _warthogThrottle.LogMessage += message =>
+            {
+                _statusLabel.Text = message;
+            };
             _dcsBios.Start();
-
-            Console.WriteLine(
-                "MAIN: _dcsBios.Start() erfolgreich beendet");
 
             _statusLabel.Text =
                 "DCS-BIOS: gestartet – warte auf Daten";
         }
         catch (Exception ex)
         {
-            Console.WriteLine(
-                "========================================");
-
-            Console.WriteLine(
-                "MAIN: DCS-BIOS START FEHLER");
-
-            Console.WriteLine(ex.ToString());
-
-            Console.WriteLine(
-                "========================================");
-
             _statusLabel.Text =
                 "DCS-BIOS: FEHLER";
 
@@ -180,8 +160,6 @@ _warthogThrottle.LogMessage += message =>
 
     private void OnDcsBiosLog(string message)
     {
-        Console.WriteLine(message);
-
         System.Diagnostics.Debug.WriteLine(message);
 
         if (InvokeRequired)
@@ -213,9 +191,6 @@ private void OnDcsBiosWrite(ushort address, ushort value)
     if (address != 0x7560)
         return;
 
-    Console.WriteLine(
-        $"DCS-BIOS 0x{address:X4}: value={value}");
-
     int level;
 
     if (value == 0)
@@ -227,15 +202,10 @@ private void OnDcsBiosWrite(ushort address, ushort value)
     else
         level = 3;
 
-    Console.WriteLine(
-        $"Backlight Level berechnet: {level}");
 
     try
     {
         _warthogThrottle?.SetBacklightLevel(level);
-
-        Console.WriteLine(
-            $"SetBacklightLevel({level}) aufgerufen");
     }
     catch (Exception ex)
     {
@@ -260,56 +230,24 @@ private void OnDcsBiosWrite(ushort address, ushort value)
     // BACKLIGHT UI
     // ====================================================================
 
-    private void UpdateBacklightDisplay(
-        ushort value,
-        int level)
+    private void UpdateBacklightDisplay(ushort value, int level)
     {
-        _valueLabel.Text =
-            $"{value}  (0x{value:X4})";
+        _valueLabel.Text =  $"{value}  (0x{value:X4})";
 
-        _backlightLabel.Text =
-            $"Backlight: Level {level}";
+        _backlightLabel.Text = $"Backlight: Level {level}";
 
         _statusLabel.Text =
             "DCS-BIOS: Daten werden empfangen";
     }
 
 
-    // ====================================================================
-    // THROTTLE BACKLIGHT
-    // ====================================================================
-
-    private void SetThrottleBacklight(int level)
-    {
-        // ------------------------------------------------------------
-        // TODO:
-        //
-        // Hier wird deine bestehende WarthogThrottle-Ansteuerung
-        // aufgerufen.
-        //
-        // level:
-        //
-        // 0 = OFF
-        // 1 = Level 1
-        // 2 = Level 2
-        // 3 = Level 3
-        // ------------------------------------------------------------
-
-        Console.WriteLine(
-            $"THROTTLE BACKLIGHT -> LEVEL {level}");
-    }
-
 
     // ====================================================================
     // FORM CLOSED
     // ====================================================================
 
-    protected override void OnFormClosed(
-        FormClosedEventArgs e)
+    protected override void OnFormClosed(FormClosedEventArgs e)
     {
-        Console.WriteLine(
-            "MAIN: Form wird geschlossen");
-
         try
         {
             _dcsBios?.Dispose();
