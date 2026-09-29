@@ -11,6 +11,7 @@ public class MainForm : Form
     private readonly Label _valueLabel;
     private readonly Label _statusLabel;
     private readonly Label _backlightLabel;
+    private int _lastBacklightLevel = -1;
 
     public MainForm()
     {
@@ -202,15 +203,20 @@ private void OnDcsBiosWrite(ushort address, ushort value)
     else
         level = 3;
 
+    // Nur aktualisieren, wenn sich der Backlight-Level geändert hat.
+    if (level != _lastBacklightLevel)
+    {
+        _lastBacklightLevel = level;
 
-    try
-    {
-        _warthogThrottle?.SetBacklightLevel(level);
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine(
-            $"FEHLER Warthog Backlight: {ex}");
+        try
+        {
+            _warthogThrottle?.SetBacklightLevel(level);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(
+                $"FEHLER Warthog Backlight: {ex}");
+        }
     }
 
     if (InvokeRequired)
@@ -218,11 +224,13 @@ private void OnDcsBiosWrite(ushort address, ushort value)
         BeginInvoke(() =>
         {
             _valueLabel.Text = value.ToString();
+            _backlightLabel.Text = $"Backlight: {level}";
         });
     }
     else
     {
         _valueLabel.Text = value.ToString();
+        _backlightLabel.Text = $"Backlight: {level}";
     }
 }
 
