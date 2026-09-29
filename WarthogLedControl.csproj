@@ -10,4 +10,9 @@
   <ItemGroup>
     <PackageReference Include="HidSharp" Version="2.1.0" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>
