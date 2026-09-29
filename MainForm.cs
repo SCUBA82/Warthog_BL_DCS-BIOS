@@ -12,9 +12,11 @@ public class MainForm : Form
     private readonly Label _statusLabel;
     private readonly Label _backlightLabel;
     private int _lastBacklightLevel = -1;
+    private readonly AppConfig _config;
 
     public MainForm()
     {
+        _config = AppConfig.Load("appsettings.json");
         Text = "Warthog LED Control";
 
         StartPosition = FormStartPosition.CenterScreen;
@@ -121,7 +123,7 @@ public class MainForm : Form
             _dcsBios.DebugFrames = true;
 
             // FA_18C_hornet_INSTR_INT_LT
-            _dcsBios.DebugAddress = 0x7560;
+            _dcsBios.DebugAddress = _config.DcsBios.GetAddress();
 
             _dcsBios.LogMessage += OnDcsBiosLog;
 
@@ -189,19 +191,24 @@ public class MainForm : Form
 
 private void OnDcsBiosWrite(ushort address, ushort value)
 {
-    if (address != 0x7560)
+       if (address != _config.DcsBios.GetAddress())
         return;
-
-    int level;
-
-    if (value == 0)
-        level = 0;
-    else if (value < 20000)
-        level = 1;
-    else if (value <= 40000)
-        level = 2;
-    else
-        level = 3;
+    
+    BacklightLevel? matchingLevel = null;
+    
+    foreach (var configuredLevel in _config.Backlight.Levels)
+    {
+        if (configuredLevel.Contains(value))
+        {
+            matchingLevel = configuredLevel;
+            break;
+        }
+    }
+    
+    if (matchingLevel == null)
+        return;
+    
+    int level = matchingLevel.Level;
 
     // Nur aktualisieren, wenn sich der Backlight-Level geändert hat.
     if (level != _lastBacklightLevel)
