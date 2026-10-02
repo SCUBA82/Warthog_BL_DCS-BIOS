@@ -452,9 +452,7 @@ public class MainForm : Form
     // BACKLIGHT UI
     // ====================================================================
 
-    private void UpdateBacklightDisplay(
-        ushort value,
-        int level)
+    private void UpdateBacklightDisplay(ushort value, int level)
     {
         if (InvokeRequired)
         {
@@ -469,8 +467,7 @@ public class MainForm : Form
         _valueLabel.Text =
             $"{value}  (0x{value:X4})";
 
-        _backlightLabel.Text =
-            $"Backlight: Level {level}";
+        _backlightLabel.Text = $"Backlight: Level {level}";
 
         _statusLabel.Text =
             "DCS-BIOS: Daten werden empfangen";
@@ -481,8 +478,7 @@ public class MainForm : Form
     // FORM CLOSED
     // ====================================================================
 
-    protected override void OnFormClosed(
-        FormClosedEventArgs e)
+    protected override void OnFormClosed(FormClosedEventArgs e)
     {
         try
         {
