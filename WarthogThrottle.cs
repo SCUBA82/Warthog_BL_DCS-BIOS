@@ -99,6 +99,31 @@ public sealed class WarthogThrottle : IDisposable
             $"mask=0x{_ledMask:X2}, " +
             $"brightness=0x{_brightness:X2}");
 
+        byte newLedMask = _ledMask;
+        byte newBrightness = _brightness;
+        
+        if (level == 0)
+        {
+            newLedMask &= unchecked((byte)~BacklightBit);
+            newBrightness = 0;
+        }
+        else
+        {
+            newLedMask |= BacklightBit;
+            newBrightness = (byte)level;
+        }
+        
+        if (newLedMask == _ledMask &&
+            newBrightness == _brightness)
+        {
+            Log(
+                $"Backlight unverändert: level={level} – kein HID SEND");
+            return;
+        }
+        
+        _ledMask = newLedMask;
+        _brightness = newBrightness;
+        
         Send();
     }
 

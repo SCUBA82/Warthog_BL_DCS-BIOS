@@ -1,13 +1,38 @@
 <Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
+    <!-- Windows x64 -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+
+    <!-- .NET Runtime wird nicht mitgeliefert -->
+    <SelfContained>false</SelfContained>
+
+    <!-- Eine EXE -->
+    <PublishSingleFile>true</PublishSingleFile>
+
+    <!-- Keine Debug-Symbole -->
+    <DebugType>None</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+
+    <!-- Keine ReadyToRun-Daten -->
+    <PublishReadyToRun>false</PublishReadyToRun>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="HidSharp" Version="2.1.0" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

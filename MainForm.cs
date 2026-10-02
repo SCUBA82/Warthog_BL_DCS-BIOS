@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
 
 namespace WarthogLedControl;
@@ -8,17 +9,68 @@ public class MainForm : Form
 {
     private DcsBiosListener? _dcsBios;
     private WarthogThrottle? _warthogThrottle;
+
     private readonly Label _valueLabel;
     private readonly Label _statusLabel;
     private readonly Label _backlightLabel;
+    private readonly Label _addressLabel;
+
+    private int _lastBacklightLevel = -1;
+
+    private readonly AppConfig _config;
+    private readonly string _configFile;
+
+    private SetupTab _setupTab = null!;
 
     public MainForm()
     {
+        // ============================================================
+        // KONFIGURATION
+        // ============================================================
+
+        _configFile = Path.Combine(
+            AppContext.BaseDirectory,
+            "appsettings.json");
+
+        _config = AppConfig.Load(_configFile);
+
+        // ============================================================
+        // FORM
+        // ============================================================
+
         Text = "Warthog LED Control";
 
         StartPosition = FormStartPosition.CenterScreen;
 
-        ClientSize = new Size(520, 280);
+        ClientSize = new Size(620, 360);
+
+        // ============================================================
+        // TAB CONTROL
+        // ============================================================
+
+        var tabControl = new TabControl
+        {
+            Dock = DockStyle.Fill
+        };
+
+        var mainTab = new TabPage("Main");
+
+        // SetupTab stellt seine eigene TabPage bereit.
+        _setupTab = new SetupTab(
+            _config,
+            _configFile);
+
+        _setupTab.ConfigurationChanged +=
+            OnConfigurationChanged;
+
+        tabControl.TabPages.Add(mainTab);
+        tabControl.TabPages.Add(_setupTab.TabPage);
+
+        Controls.Add(tabControl);
+
+        // ============================================================
+        // MAIN TAB AUFBAUEN
+        // ============================================================
 
         // ------------------------------------------------------------
         // Titel
@@ -32,21 +84,21 @@ public class MainForm : Form
                 "Segoe UI",
                 16,
                 FontStyle.Bold),
-            Location = new Point(25, 20)
+            Location = new Point(25, 25)
         };
 
         // ------------------------------------------------------------
         // DCS-BIOS Adresse
         // ------------------------------------------------------------
 
-        var addressLabel = new Label
+        _addressLabel = new Label
         {
-            Text = "FA_18C_hornet_INSTR_INT_LT (0x7560):",
+            Text = GetAddressDisplayText(),
             AutoSize = true,
             Font = new Font(
                 "Segoe UI",
                 11),
-            Location = new Point(25, 75)
+            Location = new Point(25, 85)
         };
 
         // ------------------------------------------------------------
@@ -61,7 +113,7 @@ public class MainForm : Form
                 "Consolas",
                 18,
                 FontStyle.Bold),
-            Location = new Point(365, 70)
+            Location = new Point(430, 80)
         };
 
         // ------------------------------------------------------------
@@ -76,7 +128,7 @@ public class MainForm : Form
                 "Segoe UI",
                 11,
                 FontStyle.Bold),
-            Location = new Point(25, 120)
+            Location = new Point(25, 135)
         };
 
         // ------------------------------------------------------------
@@ -90,16 +142,106 @@ public class MainForm : Form
             Font = new Font(
                 "Segoe UI",
                 10),
-            Location = new Point(25, 165)
+            Location = new Point(25, 185)
         };
 
-        Controls.Add(titleLabel);
-        Controls.Add(addressLabel);
-        Controls.Add(_valueLabel);
-        Controls.Add(_backlightLabel);
-        Controls.Add(_statusLabel);
+        // ------------------------------------------------------------
+        // Controls zum Main-Tab hinzufügen
+        // ------------------------------------------------------------
+
+        mainTab.Controls.Add(titleLabel);
+        mainTab.Controls.Add(_addressLabel);
+        mainTab.Controls.Add(_valueLabel);
+        mainTab.Controls.Add(_backlightLabel);
+        mainTab.Controls.Add(_statusLabel);
+
+        // ============================================================
+        // DCS-BIOS STARTEN
+        // ============================================================
 
         StartDcsBios();
+    }
+
+
+    // ====================================================================
+    // ADDRESS DISPLAY
+    // ====================================================================
+
+    private string GetAddressDisplayText()
+    {
+        try
+        {
+            ushort address =
+                _config.DcsBios.GetAddress();
+
+            return $"DCS-BIOS Adresse: 0x{address:X4}";
+        }
+        catch
+        {
+            return $"DCS-BIOS Adresse: {_config.DcsBios.Address}";
+        }
+    }
+
+
+    // ====================================================================
+    // CONFIGURATION CHANGED
+    // ====================================================================
+
+    private void OnConfigurationChanged()
+    {
+        try
+        {
+            ushort address =
+                _config.DcsBios.GetAddress();
+
+            // --------------------------------------------------------
+            // Debug-Adresse aktualisieren
+            // --------------------------------------------------------
+
+            if (_dcsBios != null)
+            {
+                _dcsBios.DebugAddress = address;
+            }
+
+            // --------------------------------------------------------
+            // Letzten Backlight-Level zurücksetzen.
+            //
+            // Dadurch wird der neue Level beim nächsten DCS-BIOS
+            // Wert garantiert an den Warthog übertragen.
+            // --------------------------------------------------------
+
+            _lastBacklightLevel = -1;
+
+            // --------------------------------------------------------
+            // Anzeige aktualisieren
+            // --------------------------------------------------------
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(
+                    UpdateConfigurationDisplay));
+
+                return;
+            }
+
+            UpdateConfigurationDisplay();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                this,
+                $"Die neue Konfiguration konnte nicht übernommen werden:\n\n{ex.Message}",
+                "Konfigurationsfehler",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+    }
+
+
+    private void UpdateConfigurationDisplay()
+    {
+        _addressLabel.Text =
+            GetAddressDisplayText();
     }
 
 
@@ -111,57 +253,56 @@ public class MainForm : Form
     {
         try
         {
-            Console.WriteLine(
-                "MAIN: StartDcsBios()");
-
             _statusLabel.Text =
                 "DCS-BIOS: Listener wird erstellt...";
 
-            _dcsBios = new DcsBiosListener();
+            // --------------------------------------------------------
+            // DCS-BIOS Listener
+            // --------------------------------------------------------
+
+            _dcsBios =
+                new DcsBiosListener();
 
             _dcsBios.DebugWrites = true;
             _dcsBios.DebugFrames = true;
 
-            // FA_18C_hornet_INSTR_INT_LT
-            _dcsBios.DebugAddress = 0x7560;
+            _dcsBios.DebugAddress =
+                _config.DcsBios.GetAddress();
 
-            _dcsBios.LogMessage += OnDcsBiosLog;
+            // --------------------------------------------------------
+            // Events
+            // --------------------------------------------------------
 
-            _dcsBios.DcsBiosWrite += OnDcsBiosWrite;
+            _dcsBios.LogMessage +=
+                OnDcsBiosLog;
+
+            _dcsBios.DcsBiosWrite +=
+                OnDcsBiosWrite;
 
             _statusLabel.Text =
                 "DCS-BIOS: wird gestartet...";
 
-            Console.WriteLine(
-                "MAIN: Aufruf _dcsBios.Start()");
+            // --------------------------------------------------------
+            // Warthog Throttle
+            // --------------------------------------------------------
 
-              _warthogThrottle = new WarthogThrottle();
+            _warthogThrottle =
+                new WarthogThrottle();
 
-_warthogThrottle.LogMessage += message =>
-{
-    _statusLabel.Text = message;
-};
+            _warthogThrottle.LogMessage +=
+                OnWarthogLog;
+
+            // --------------------------------------------------------
+            // DCS-BIOS starten
+            // --------------------------------------------------------
+
             _dcsBios.Start();
-
-            Console.WriteLine(
-                "MAIN: _dcsBios.Start() erfolgreich beendet");
 
             _statusLabel.Text =
                 "DCS-BIOS: gestartet – warte auf Daten";
         }
         catch (Exception ex)
         {
-            Console.WriteLine(
-                "========================================");
-
-            Console.WriteLine(
-                "MAIN: DCS-BIOS START FEHLER");
-
-            Console.WriteLine(ex.ToString());
-
-            Console.WriteLine(
-                "========================================");
-
             _statusLabel.Text =
                 "DCS-BIOS: FEHLER";
 
@@ -175,13 +316,29 @@ _warthogThrottle.LogMessage += message =>
 
 
     // ====================================================================
+    // WARTHOG LOG
+    // ====================================================================
+
+    private void OnWarthogLog(string message)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(new Action(() =>
+                OnWarthogLog(message)));
+
+            return;
+        }
+
+        _statusLabel.Text = message;
+    }
+
+
+    // ====================================================================
     // DCS-BIOS LOG
     // ====================================================================
 
     private void OnDcsBiosLog(string message)
     {
-        Console.WriteLine(message);
-
         System.Diagnostics.Debug.WriteLine(message);
 
         if (InvokeRequired)
@@ -208,53 +365,88 @@ _warthogThrottle.LogMessage += message =>
     // DCS-BIOS WRITE
     // ====================================================================
 
-private void OnDcsBiosWrite(ushort address, ushort value)
-{
-    if (address != 0x7560)
-        return;
-
-    Console.WriteLine(
-        $"DCS-BIOS 0x{address:X4}: value={value}");
-
-    int level;
-
-    if (value == 0)
-        level = 0;
-    else if (value < 20000)
-        level = 1;
-    else if (value <= 40000)
-        level = 2;
-    else
-        level = 3;
-
-    Console.WriteLine(
-        $"Backlight Level berechnet: {level}");
-
-    try
+    private void OnDcsBiosWrite(
+        ushort address,
+        ushort value)
     {
-        _warthogThrottle?.SetBacklightLevel(level);
+        // ------------------------------------------------------------
+        // Konfigurierte DCS-BIOS-Adresse holen
+        // ------------------------------------------------------------
 
-        Console.WriteLine(
-            $"SetBacklightLevel({level}) aufgerufen");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine(
-            $"FEHLER Warthog Backlight: {ex}");
-    }
+        ushort configuredAddress;
 
-    if (InvokeRequired)
-    {
-        BeginInvoke(() =>
+        try
         {
-            _valueLabel.Text = value.ToString();
-        });
+            configuredAddress =
+                _config.DcsBios.GetAddress();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"FEHLER: Ungültige DCS-BIOS-Adresse: {ex.Message}");
+
+            return;
+        }
+
+        // ------------------------------------------------------------
+        // Nur die konfigurierte Adresse verarbeiten
+        // ------------------------------------------------------------
+
+        if (address != configuredAddress)
+            return;
+
+        // ------------------------------------------------------------
+        // Passenden Backlight-Level suchen
+        // ------------------------------------------------------------
+
+        BacklightLevel? matchingLevel = null;
+
+        foreach (var configuredLevel in
+                 _config.Backlight.Levels)
+        {
+            if (configuredLevel.Contains(value))
+            {
+                matchingLevel = configuredLevel;
+                break;
+            }
+        }
+
+        // Kein Bereich für diesen Wert definiert.
+        if (matchingLevel == null)
+            return;
+
+        int level =
+            matchingLevel.Level;
+
+        // ------------------------------------------------------------
+        // Backlight nur aktualisieren, wenn sich der Level geändert hat
+        // ------------------------------------------------------------
+
+        if (level != _lastBacklightLevel)
+        {
+            _lastBacklightLevel = level;
+
+            try
+            {
+                _warthogThrottle?
+                    .SetBacklightLevel(level);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"FEHLER Warthog Backlight: {ex}");
+            }
+        }
+
+        // ------------------------------------------------------------
+        // UI aktualisieren
+        // ------------------------------------------------------------
+
+        UpdateBacklightDisplay(
+            value,
+            level);
     }
-    else
-    {
-        _valueLabel.Text = value.ToString();
-    }
-}
+
 
     // ====================================================================
     // BACKLIGHT UI
@@ -264,6 +456,16 @@ private void OnDcsBiosWrite(ushort address, ushort value)
         ushort value,
         int level)
     {
+        if (InvokeRequired)
+        {
+            BeginInvoke(new Action(() =>
+                UpdateBacklightDisplay(
+                    value,
+                    level)));
+
+            return;
+        }
+
         _valueLabel.Text =
             $"{value}  (0x{value:X4})";
 
@@ -276,47 +478,28 @@ private void OnDcsBiosWrite(ushort address, ushort value)
 
 
     // ====================================================================
-    // THROTTLE BACKLIGHT
-    // ====================================================================
-
-    private void SetThrottleBacklight(int level)
-    {
-        // ------------------------------------------------------------
-        // TODO:
-        //
-        // Hier wird deine bestehende WarthogThrottle-Ansteuerung
-        // aufgerufen.
-        //
-        // level:
-        //
-        // 0 = OFF
-        // 1 = Level 1
-        // 2 = Level 2
-        // 3 = Level 3
-        // ------------------------------------------------------------
-
-        Console.WriteLine(
-            $"THROTTLE BACKLIGHT -> LEVEL {level}");
-    }
-
-
-    // ====================================================================
     // FORM CLOSED
     // ====================================================================
 
     protected override void OnFormClosed(
         FormClosedEventArgs e)
     {
-        Console.WriteLine(
-            "MAIN: Form wird geschlossen");
-
         try
         {
-            _dcsBios?.Dispose();
+            if (_dcsBios != null)
+            {
+                _dcsBios.DcsBiosWrite -=
+                    OnDcsBiosWrite;
+
+                _dcsBios.LogMessage -=
+                    OnDcsBiosLog;
+
+                _dcsBios.Dispose();
+            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine(
+            System.Diagnostics.Debug.WriteLine(
                 $"MAIN: Fehler beim Stoppen von DCS-BIOS: {ex}");
         }
 
