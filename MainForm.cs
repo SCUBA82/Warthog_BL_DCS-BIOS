@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.IO;
+using System.Reflection;
 using System.Windows.Forms;
 
 namespace WarthogLedControl;
@@ -22,6 +23,15 @@ public class MainForm : Form
 
     private SetupTab _setupTab = null!;
 
+  // ============================================================
+    // TRAY
+    // ============================================================
+
+    private readonly NotifyIcon _trayIcon;
+    private readonly ContextMenuStrip _trayMenu;
+
+    // true = Anwendung darf tatsächlich beendet werden
+    private bool _allowExit;
     public MainForm()
     {
         // ============================================================
@@ -44,6 +54,43 @@ public class MainForm : Form
 
         ClientSize = new Size(620, 360);
 
+// Fenster-Icon
+        Icon = LoadApplicationIcon();
+
+        // ============================================================
+        // TRAY ICON
+        // ============================================================
+
+        _trayMenu = new ContextMenuStrip();
+
+        _trayMenu.Items.Add(
+            "Öffnen",
+            null,
+            TrayOpen_Click);
+
+        _trayMenu.Items.Add(
+            new ToolStripSeparator());
+
+        _trayMenu.Items.Add(
+            "Beenden",
+            null,
+            TrayExit_Click);
+
+        _trayIcon = new NotifyIcon
+        {
+            Icon = Icon ?? SystemIcons.Application,
+            Text = "Warthog LED Control",
+            ContextMenuStrip = _trayMenu,
+            Visible = true
+        };
+
+        _trayIcon.DoubleClick += TrayIcon_DoubleClick;
+
+        // ============================================================
+        // FORM EVENTS
+        // ============================================================
+
+        Resize += MainForm_Resize;
         // ============================================================
         // TAB CONTROL
         // ============================================================
@@ -145,6 +192,26 @@ public class MainForm : Form
             Location = new Point(25, 185)
         };
 
+  // ------------------------------------------------------------
+            // Beenden Button
+            // ------------------------------------------------------------
+
+            var exitButton = new Button
+            {
+                Text = "Beenden",
+                AutoSize = true,
+                Location = new Point(25, 235)
+            };
+
+            exitButton.Click += (_, _) =>
+            {
+                _allowExit = true;
+                _trayIcon.Visible = false;
+                Close();
+            };
+
+ 
+
         // ------------------------------------------------------------
         // Controls zum Main-Tab hinzufügen
         // ------------------------------------------------------------
@@ -154,6 +221,8 @@ public class MainForm : Form
         mainTab.Controls.Add(_valueLabel);
         mainTab.Controls.Add(_backlightLabel);
         mainTab.Controls.Add(_statusLabel);
+        mainTab.Controls.Add(exitButton);
+
 
         // ============================================================
         // DCS-BIOS STARTEN
@@ -164,6 +233,96 @@ public class MainForm : Form
 
 
     // ====================================================================
+    // APPLICATION ICON
+    // ====================================================================
+
+
+    private static Icon LoadApplicationIcon()
+    {
+        try
+        {
+            string iconPath = Path.Combine(
+                AppContext.BaseDirectory,
+                "Resources",
+                "Icon.ico");
+
+            if (File.Exists(iconPath))
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"MAIN: Icon geladen: {iconPath}");
+
+                return new Icon(iconPath);
+            }
+
+            System.Diagnostics.Debug.WriteLine(
+                $"MAIN: Icon-Datei nicht gefunden: {iconPath}");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"MAIN: Icon konnte nicht geladen werden: {ex}");
+        }
+
+        return SystemIcons.Application;
+    }
+
+
+
+
+    // ====================================================================
+    // TRAY
+    // ====================================================================
+
+    private void MainForm_Resize(
+        object? sender,
+        EventArgs e)
+    {
+        if (WindowState == FormWindowState.Minimized)
+        {
+            Hide();
+        }
+    }
+
+
+    private void TrayIcon_DoubleClick(
+        object? sender,
+        EventArgs e)
+    {
+        ShowFromTray();
+    }
+
+
+    private void TrayOpen_Click(
+        object? sender,
+        EventArgs e)
+    {
+        ShowFromTray();
+    }
+
+
+    private void ShowFromTray()
+    {
+        Show();
+
+        WindowState = FormWindowState.Normal;
+
+        Activate();
+
+        // Fenster sicher in den Vordergrund bringen.
+        BringToFront();
+    }
+
+
+    private void TrayExit_Click(
+        object? sender,
+        EventArgs e)
+    {
+        _allowExit = true;
+
+        _trayIcon.Visible = false;
+
+        Close();
+    }
     // ADDRESS DISPLAY
     // ====================================================================
 
@@ -452,7 +611,9 @@ public class MainForm : Form
     // BACKLIGHT UI
     // ====================================================================
 
-    private void UpdateBacklightDisplay(ushort value, int level)
+    private void UpdateBacklightDisplay(
+        ushort value,
+        int level)
     {
         if (InvokeRequired)
         {
@@ -467,7 +628,8 @@ public class MainForm : Form
         _valueLabel.Text =
             $"{value}  (0x{value:X4})";
 
-        _backlightLabel.Text = $"Backlight: Level {level}";
+        _backlightLabel.Text =
+            $"Backlight: Level {level}";
 
         _statusLabel.Text =
             "DCS-BIOS: Daten werden empfangen";
@@ -475,11 +637,54 @@ public class MainForm : Form
 
 
     // ====================================================================
+    // FORM CLOSING
+    // ====================================================================
+
+    protected override void OnFormClosing(
+        FormClosingEventArgs e)
+    {
+        // ------------------------------------------------------------
+        // Normaler Klick auf X:
+        // Anwendung NICHT beenden, sondern in den Tray minimieren.
+        // ------------------------------------------------------------
+
+        if (!_allowExit &&
+            e.CloseReason == CloseReason.UserClosing)
+        {
+            e.Cancel = true;
+
+            Hide();
+
+            return;
+        }
+
+        base.OnFormClosing(e);
+    }
+
+
+    // ====================================================================
     // FORM CLOSED
     // ====================================================================
 
-    protected override void OnFormClosed(FormClosedEventArgs e)
+    protected override void OnFormClosed(
+        FormClosedEventArgs e)
     {
+        try
+        {
+            _trayIcon.Visible = false;
+
+            _trayIcon.DoubleClick -=
+                TrayIcon_DoubleClick;
+
+            _trayMenu.Dispose();
+            _trayIcon.Dispose();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"MAIN: Fehler beim Entfernen des Tray-Icons: {ex}");
+        }
+
         try
         {
             if (_dcsBios != null)

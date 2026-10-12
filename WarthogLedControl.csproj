@@ -6,22 +6,13 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-
-    <!-- Windows x64 -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-
-    <!-- .NET Runtime wird nicht mitgeliefert -->
     <SelfContained>false</SelfContained>
-
-    <!-- Eine EXE -->
     <PublishSingleFile>true</PublishSingleFile>
-
-    <!-- Keine Debug-Symbole -->
     <DebugType>None</DebugType>
     <DebugSymbols>false</DebugSymbols>
-
-    <!-- Keine ReadyToRun-Daten -->
     <PublishReadyToRun>false</PublishReadyToRun>
+     <ApplicationIcon>Resources\Icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
