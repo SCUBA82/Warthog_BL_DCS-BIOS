@@ -10,6 +10,7 @@ public class SetupTab
     private readonly TabPage _tabPage;
 
     private TextBox _addressTextBox = null!;
+    private CheckBox _startMinimizedCheckBox = null!;
     private DataGridView _levelsGrid = null!;
 
     private Button _saveButton = null!;
@@ -42,11 +43,13 @@ public class SetupTab
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 3,
+            RowCount = 4,
             Padding = new Padding(10)
         };
 
         mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 80));
+
+        mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 55));
 
         mainPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
@@ -98,6 +101,29 @@ public class SetupTab
         dcsGroup.Controls.Add(addressPanel);
 
         mainPanel.Controls.Add(dcsGroup, 0, 0);
+
+
+        // ================================================================
+        // PROGRAMMSTART
+        // ================================================================
+
+        var startupGroup = new GroupBox
+        {
+            Text = "Programmstart",
+            Dock = DockStyle.Fill,
+            Padding = new Padding(10, 5, 10, 5)
+        };
+
+        _startMinimizedCheckBox = new CheckBox
+        {
+            Text = "Immer minimiert starten (im Tray)",
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+
+        startupGroup.Controls.Add(_startMinimizedCheckBox);
+
+        mainPanel.Controls.Add(startupGroup, 0, 1);
 
 
         // ================================================================
@@ -160,7 +186,7 @@ public class SetupTab
 
         backlightGroup.Controls.Add(_levelsGrid);
 
-        mainPanel.Controls.Add(backlightGroup, 0, 1);
+        mainPanel.Controls.Add(backlightGroup, 0, 2);
 
 
         // ================================================================
@@ -200,7 +226,7 @@ public class SetupTab
         buttonPanel.Controls.Add(_reloadButton);
 
 
-        mainPanel.Controls.Add(buttonPanel, 0, 2);
+        mainPanel.Controls.Add(buttonPanel, 0, 3);
 
 
         _tabPage.Controls.Add(mainPanel);
@@ -215,6 +241,9 @@ public class SetupTab
     {
         _addressTextBox.Text =
             _config.DcsBios.Address;
+
+        _startMinimizedCheckBox.Checked =
+            _config.StartMinimized;
 
         _levelsGrid.Rows.Clear();
 
@@ -244,6 +273,8 @@ public class SetupTab
 
 
             _config.DcsBios.Address = newConfig.DcsBios.Address;
+
+            _config.StartMinimized = newConfig.StartMinimized;
 
             _config.Backlight.Levels = newConfig.Backlight.Levels;
             LoadFromConfig();
@@ -292,6 +323,8 @@ public class SetupTab
 
 
             _config.DcsBios.Address = _addressTextBox.Text.Trim();
+
+            _config.StartMinimized = _startMinimizedCheckBox.Checked;
 
 
             var levels = new List<BacklightLevel>();

@@ -9,6 +9,9 @@ public class AppConfig
 
     public BacklightConfig Backlight { get; set; } = new();
 
+    // true = Programm startet immer minimiert (im Tray)
+    public bool StartMinimized { get; set; } = false;
+
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

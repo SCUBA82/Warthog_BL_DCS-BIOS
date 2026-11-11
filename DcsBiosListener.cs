@@ -118,6 +118,30 @@ namespace WarthogLedControl
 
         public long ParserErrors { get; private set; }
 
+        // Zeitpunkt (Environment.TickCount64) des letzten UDP-Pakets.
+        // -1 = seit dem Start noch kein Paket empfangen.
+        private long _lastPacketTick = -1;
+
+        /// <summary>
+        /// Zeit seit dem letzten empfangenen UDP-Paket.
+        /// null = seit dem Start wurde noch kein Paket empfangen.
+        /// </summary>
+        public TimeSpan? TimeSinceLastPacket
+        {
+            get
+            {
+                long last = Volatile.Read(ref _lastPacketTick);
+
+                if (last < 0)
+                    return null;
+
+                return TimeSpan.FromMilliseconds(
+                    Math.Max(0, Environment.TickCount64 - last));
+            }
+        }
+
+        public bool IsRunning => _running;
+
         // --------------------------------------------------------------------
         // Parser
         // --------------------------------------------------------------------
@@ -143,6 +167,8 @@ namespace WarthogLedControl
                 return;
 
             _running = true;
+
+            Volatile.Write(ref _lastPacketTick, -1);
 
             _cts = new CancellationTokenSource();
 
@@ -253,6 +279,10 @@ namespace WarthogLedControl
                     UdpReceiveResult result =
                         await _udpClient.ReceiveAsync(
                             cancellationToken);
+
+                    Volatile.Write(
+                        ref _lastPacketTick,
+                        Environment.TickCount64);
 
                     ReceivedUdpPackets++;
 
