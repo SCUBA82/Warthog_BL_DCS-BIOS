@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("WarthogLedControl")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e7d55cab4d623019e76f49486e7483d132814ae9")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5d11ff44d37d137d2d63bf93512af068b5351115")]
 [assembly: System.Reflection.AssemblyProductAttribute("WarthogLedControl")]
 [assembly: System.Reflection.AssemblyTitleAttribute("WarthogLedControl")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
